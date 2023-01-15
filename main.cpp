@@ -2,6 +2,7 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <cmath>
 
 typedef struct color_map {
 	color_map(){}
@@ -65,8 +66,8 @@ void draw_rectangle(std::vector<color_map> &img, const int img_w, const int img_
 			for (auto j=0; j<h; j++) {
 				auto cx = x+i;
 				auto cy = y+j;
-				if(cx>img_w && cy>img_h)
-					throw(2);
+				if(cx>=img_w || cy>=img_h)
+                    continue;
 				img[cx + cy*img_w] = color;
 			}
 		}
@@ -79,10 +80,6 @@ void draw_rectangle(std::vector<color_map> &img, const int img_w, const int img_
 				std::cout << ":ivalid size of image, image.size()" << std::endl;
 			break;
 
-			case 2:
-				std::cout << ":ivalid value x or y" << std::endl;
-			break;
-			
 			default:
 				std::cout << ":code-" << err;
 			break;
@@ -92,7 +89,9 @@ void draw_rectangle(std::vector<color_map> &img, const int img_w, const int img_
 int main() {
     const int width = 512; // image width
     const int height = 512; // image height
+    const int diagonal = sqrt(width*width + height*height); 
     std::vector<color_map> framebuffer(width*height);
+    std::vector<color_map> framebuffer3d(width*height, color_map(255, 255, 255));
 
 	const size_t map_w = 16; // map width
     const size_t map_h = 16; // map height
@@ -112,7 +111,12 @@ int main() {
                        "0 0000000      0"\
                        "0              0"\
                        "0002222222200000"; 
-
+    //player parameters
+    float player_x = 3.456;
+    float player_y = 2.345;
+    float player_a = 1.523;
+    const float field_of_view = M_PI/3.0f;
+    
     for (auto j = 0; j<height; j++) { // fill the screen with color gradients
         for (auto i = 0; i<width; i++) {
             color_map color(255*j/float(width), 255*i/float(width), 0);
@@ -132,7 +136,31 @@ int main() {
 		}
     }
 
+    //draw the player on the map
+    draw_rectangle(framebuffer, width, height, player_x*rect_w, player_y*rect_h, 5, 5, color_map(255, 255, 255));
+
+    //draw the visibility cone
+    for(auto i=0; i < width; i++){
+        float angle = player_a-field_of_view/2 + field_of_view*i/float(width);
+
+        for(auto t=0; t < diagonal; t++) {
+            float cx = player_x + t * 0.05 * cos(angle);
+            float cy = player_y + t * 0.05 * sin(angle);
+    
+            if(map[int(cx)+int(cy)*map_w] != ' ') {
+                int colum_h = height/(t*0.05);
+                draw_rectangle(framebuffer3d, width, height, i, height/2-colum_h/2, 1, 
+                               colum_h, color_map(0, 255, 255));
+                break;
+            }
+    
+            int pix_x = cx*rect_w;
+            int pix_y = cy*rect_h;
+            framebuffer[pix_x + pix_y*width] = color_map(255, 255, 255);
+        }
+    }
     drop_image("./out.ppm", framebuffer, width, height);
+    drop_image("./out3d.ppm", framebuffer3d, width, height);
 
     return 0;
 }
